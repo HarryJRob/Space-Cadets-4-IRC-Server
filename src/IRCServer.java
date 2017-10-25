@@ -4,18 +4,23 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
+import java.util.LinkedList;
 
 public class IRCServer {
 
 	private ServerSocket serverSocket;
 	private String serverName;
+	private LinkedList<String> chatLog;
 	
 	public IRCServer() {
 		this.serverName = "Unnamed Server";
+		chatLog = new LinkedList<String>();
 	}
 	
 	public IRCServer(String serverName) {
 		this.serverName = serverName;
+		chatLog = new LinkedList<String>();
 	}
 
 	public void makeSocket(int port) {
@@ -27,42 +32,9 @@ public class IRCServer {
 	}
 	
 	public void start() {
-		int count = 0;
-		while (count != 5) {
+		while (true) {
             try {
 				new clientConnection(serverSocket.accept()).run();
-				count++;
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-		}
-		System.out.println("Server ending");
-	}
-	
-	private class clientConnection implements Runnable {
-		
-		private Socket clientSocket;
-		private PrintWriter clientOutput;
-		private BufferedReader clientInput;
-		private String nickname;
-		
-		public clientConnection(Socket socket) {
-			this.clientSocket = socket;
-
-		}
-
-		@Override
-		public void run() {
-			try {
-				this.clientOutput = new PrintWriter(clientSocket.getOutputStream(), true);
-				this.clientInput = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-				
-				clientOutput.println(serverName);
-				System.out.println("Connection from: " + clientSocket.getInetAddress() + " : " + clientSocket.getPort());
-				
-				
-				
 			} catch (IOException e) {
 				System.out.println(e.toString());
 			}
@@ -70,11 +42,47 @@ public class IRCServer {
 	}
 	
 	public static void main(String[] args) {
-		System.out.println("Running Server");
 		if (args.length == 1) {
 			IRCServer myServer = new IRCServer();
 			myServer.makeSocket(Integer.parseInt(args[0]));
 			myServer.start();
 		} else { System.out.println("Usage: IRCServer <Port>"); }
 	}
+	
+	private class clientConnection implements Runnable {
+		
+		private Socket clientSocket;
+		private PrintWriter outputToClient;
+		private BufferedReader inputFromClient;
+		private String connection = "";
+		
+		public clientConnection(Socket socket) {
+			this.clientSocket = socket;
+			connection = socket.getInetAddress().toString().replaceAll("/", "") + ":" + socket.getPort();
+		}
+
+		@Override
+		public void run() {
+			try {
+				this.outputToClient = new PrintWriter(clientSocket.getOutputStream(), true);
+				this.inputFromClient = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+				outputToClient.println(serverName);
+				
+				System.out.println("\nConnection from - " + connection);
+				String curLine = "";
+				
+				while(true) {
+					curLine = inputFromClient.readLine();
+					System.out.printf("%-32s%s%n",connection,"\"" + curLine + "\"");
+				}
+				
+			} catch (SocketException e) {
+				System.out.println("Connection Exiting - " + connection);
+			} catch (Exception e) {
+				System.out.println(e.toString());
+			}
+		}
+	}
+
+	
 }

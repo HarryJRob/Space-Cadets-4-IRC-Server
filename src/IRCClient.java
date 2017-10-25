@@ -4,8 +4,8 @@ import java.io.*;
 public class IRCClient {
 	
 	private Socket clientSocket;
-	private PrintWriter clientOutput;
-	private BufferedReader clientInput;
+	private PrintWriter outputToServer;
+	private BufferedReader inputFromServer;
 	
 	public static void main(String[] args) {
 		System.out.println("Running Client");
@@ -16,10 +16,12 @@ public class IRCClient {
 	public void run() {
 		setSocket("localhost", 2004);
 		try {
-			clientOutput = new PrintWriter(clientSocket.getOutputStream(), true);
-			clientInput = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+			outputToServer = new PrintWriter(clientSocket.getOutputStream(), true);
+			inputFromServer = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
 			
-			//clientOutput.println("Hello, World");
+			for (int i = 0; i <= 10; i++)
+				outputToServer.println("Hello, World: " + i);
+			outputToServer.println("Quit");
 		} catch (IOException e) {
 			System.out.println("Cannot find server");
 			System.out.println(e.toString());
