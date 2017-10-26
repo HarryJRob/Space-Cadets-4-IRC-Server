@@ -8,7 +8,6 @@ public class IRCClient {
 	private BufferedReader inputFromServer;
 	
 	public static void main(String[] args) {
-		System.out.println("Running Client");
 		IRCClient myClient = new IRCClient();
 		myClient.run();
 	}
@@ -19,9 +18,16 @@ public class IRCClient {
 			outputToServer = new PrintWriter(clientSocket.getOutputStream(), true);
 			inputFromServer = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
 			
-			for (int i = 0; i <= 10; i++)
-				outputToServer.println("Hello, World: " + i);
-			outputToServer.println("Quit");
+			
+			System.out.println("**************************************************\n                   Welcome to \n   " + inputFromServer.readLine() + "\n**************************************************");
+			
+			outputToServer.println("Harry");
+			outputToServer.println("Hello, World");
+			outputToServer.println("!help");
+			
+			while(true) 
+				System.out.println(inputFromServer.readLine());
+			
 		} catch (IOException e) {
 			System.out.println("Cannot find server");
 			System.out.println(e.toString());
