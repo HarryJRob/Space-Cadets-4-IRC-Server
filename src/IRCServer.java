@@ -6,16 +6,16 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
 import java.util.LinkedList;
-import java.util.Queue;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class IRCServer {
 
 	private ServerSocket serverSocket;
 	private String serverName;
-	private Queue<String> chatLog = new LinkedList<String>();
+	private LinkedList<String> chatLog = new LinkedList<String>();
 	private LinkedList<clientConnection> clientList = new LinkedList<clientConnection>();
-	private String adminPassword = "";
+	private String adminPassword = "test";
 	
 	public IRCServer() {
 		this.serverName = "Unnamed Server";
@@ -33,7 +33,7 @@ public class IRCServer {
 		}
 	}
 	
-	private void broadcast() {
+	private void broadcastAll() {
 		for(String message : chatLog) {
 			for (clientConnection curConnection : clientList) {
 				curConnection.sendMessage(message);
@@ -88,6 +88,8 @@ public class IRCServer {
 				outputToClient.println(serverName);
 				nickname = '[' + inputFromClient.readLine() + ']';
 				
+				chatLog.add("[Server] - " + nickname + " has joined");
+				broadcastAll();
 				System.out.println("\nConnection from - " + connection);
 				
 				while(true) {
@@ -100,52 +102,88 @@ public class IRCServer {
 						 *    !adminLogin <password>
 						 *    !changeNick <nickname>
 						 *    !help
+						 *    !quit
 						 *    
 						 *  Only possible with admin perms
 						 *    !setServerName <name>
 						 *    !kick <nickname>
 						 *    !shutdown
 						 */
-						System.out.println(curLine);
-						Pattern cmdPattern = Pattern.compile("(!adminLogin|!changeNick|!help|!setServerName|!kick|!shutdown)([.]*)", Pattern.DOTALL);
+						Pattern cmdPattern = Pattern.compile("(!adminLogin|!changeNick|!help|!setServerName|!kick|!shutdown|!quit)(.*)");
+						String command = "Invalid Command", args = "";
+						Matcher m = cmdPattern.matcher(curLine);
 						
-						System.out.println(cmdPattern.matcher(curLine));
-						String command = "";
-						String args = cmdPattern.matcher(curLine).group(1);
-						
-						System.out.println("Command: " +command+ " - " + args);
-						
-						switch (command.trim()) {
+						if (m.find()) {
+							command = m.group(1).trim();
+							args = m.group(2).trim();
+						}
+
+						switch (command) {
 						case "!adminLogin":
 							if (adminPassword != "") {
-								//Password stuff
-							} else { outputToClient.println("[Server] This server may not be accessed remotely"); }
+								if (adminPassword.equals(args)) {
+									isAdmin = true;
+									outputToClient.println("[Server] - You have successfully logged in");
+								} else { outputToClient.println("[Server] - Incorrect password"); }
+								
+							} else { outputToClient.println("[Server] - This server may not be accessed remotely"); }
+							
 							break;
+							
 						case "!changeNick":
-							// nickname stuff
+							if(args != "" && args != "Server") {
+								chatLog.add("[Server] - " + nickname + " changed their name to [" + args + "]");
+								nickname = '[' + args + ']';
+								broadcastAll();
+							}
 							break;
+							
 						case "!help":
-							if (isAdmin) {
+							if (isAdmin == false) {
 								outputToClient.println("Commands:\n    !help\n    !changeNick <nickname>\n    !adminLogin <password>");
-							} else if (!isAdmin) {
+							} else if (isAdmin) {
 								outputToClient.println("Commands:\n    !help\n    !changeNick <nickname>\n    !adminLogin <password>\n\nAdmin Commands:\n    !setServerName <name>\n    !kick <nickname>\n    !shutdown");
 							}
 							break;
+							
+						case "!quit":
+							chatLog.add("[Server] - " + nickname + " has left");
+							broadcastAll();
+							break;
 						case "!setServerName":
+							if(isAdmin) {
+								serverName = args;
+								chatLog.add("[Server] - Server name changed to \"" + serverName + "\"");
+								broadcastAll();
+							} else { outputToClient.println("[Server] - You are not authorized to use this command"); }
+							break;
 							
 						case "!kick":
+							if(isAdmin) {
+								for(clientConnection curConnection : clientList) {
+									if(curConnection.getNick() == args) {
+										curConnection.kick();
+									}
+								}
+							} else { outputToClient.println("[Server] - You are not authorized to use this command"); }
 							break;
-						case "!shutdown":
 							
+						case "!shutdown":
+							if(isAdmin) {
+								chatLog.add("[Server] - Shutting down");
+								broadcastAll();
+								System.exit(0);
+							} else { outputToClient.println("[Server] - You are not authorized to use this command"); }
 							break;
+							
 						default:
-							outputToClient.println("[Server] Command not recognised use \"!help\" to view the commands");
+							outputToClient.println("[Server] - Command not recognised use \"!help\" to view the commands");
 						}
 						System.out.printf("%-32s%s%n",connection,"Running command: " + command);
 						
 					} else {
 						chatLog.add(nickname + " - " + curLine);
-						broadcast();
+						broadcastAll();
 					}
 				}
 				
@@ -153,6 +191,19 @@ public class IRCServer {
 				System.out.println("Connection Exiting - " + connection);
 			} catch (Exception e) {
 				e.printStackTrace();
+			}
+		}
+	
+		public String getNick() {
+			return nickname;
+		}
+	
+		public void kick() {
+			outputToClient.println("[Server] - You have been kicked");
+			try {
+				clientSocket.close();
+			} catch (IOException e) {
+				System.out.println(e.toString());
 			}
 		}
 	}
