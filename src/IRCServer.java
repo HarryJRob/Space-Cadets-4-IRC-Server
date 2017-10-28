@@ -15,21 +15,19 @@ public class IRCServer {
 	private String serverName;
 	private LinkedList<String> chatLog = new LinkedList<String>();
 	private LinkedList<clientConnection> clientList = new LinkedList<clientConnection>();
-	private String adminPassword = "test";
+	private String adminPassword = "";
 	
-	public IRCServer() {
-		this.serverName = "Unnamed Server";
-	}
-	
-	public IRCServer(String serverName) {
+	public IRCServer(String serverName, int portNumber, String adminPassword) {
 		this.serverName = serverName;
+		makeSocket(portNumber);
+		this.adminPassword = adminPassword;
 	}
 
-	public void makeSocket(int port) {
+	private void makeSocket(int port) {
 		try {
 			serverSocket = new ServerSocket(port);
 		} catch (IOException e) {
-			e.printStackTrace();
+			System.out.println(e.toString());
 		}
 	}
 	
@@ -55,11 +53,25 @@ public class IRCServer {
 	}
 	
 	public static void main(String[] args) {
-		if (args.length == 1) {
-			IRCServer myServer = new IRCServer("Test Server");
-			myServer.makeSocket(Integer.parseInt(args[0]));
+		if (args.length >= 1) {
+			String name = "Unnamed Server";
+			int port = 2004;
+			String pass = "";
+			
+			for(String curStr : args) {
+				String[] parts = curStr.split(":");
+				if(parts[0].equals("port")) {
+					port = Integer.parseInt(parts[1]);
+				} else if(parts[0].equals("adminPass")) { 
+					pass = parts[1];
+				} else if(parts[0].equals("name")) { 
+					name = parts[1];
+				}
+			}
+			
+			IRCServer myServer = new IRCServer(name,port,pass);
 			myServer.start();
-		} else { System.out.println("Usage: IRCServer <Port>"); }
+		} else { System.out.println("Usage: IRCServer port:<Port Number> (Optional) adminPass:<admin password> (Optional) name:<server name>"); }
 	}
 	
 	private class clientConnection implements Runnable {
@@ -143,9 +155,9 @@ public class IRCServer {
 							
 						case "!help":
 							if (isAdmin == false) {
-								outputToClient.println("Commands:\n    !help\n    !changeNick <nickname>\n    !adminLogin <password>");
+								outputToClient.println("	Commands:\n    		!help\n    		!changeNick <nickname>\n    		!adminLogin <password>");
 							} else if (isAdmin) {
-								outputToClient.println("Commands:\n    !help\n    !changeNick <nickname>\n    !adminLogin <password>\n\nAdmin Commands:\n    !setServerName <name>\n    !shutdown");
+								outputToClient.println("	Commands:\n    		!help\n    		!changeNick <nickname>\n    		!adminLogin <password>\n\n	Admin Commands:\n    		!setServerName <name>\n    		!shutdown");
 							}
 							break;
 							
@@ -182,6 +194,8 @@ public class IRCServer {
 				}
 				
 			} catch (SocketException e) {
+				chatLog.add("[Server] - " + nickname + " has left");
+				broadcastAll();
 				System.out.println("Connection Exiting - " + connection);
 			} catch (Exception e) {
 				e.printStackTrace();
