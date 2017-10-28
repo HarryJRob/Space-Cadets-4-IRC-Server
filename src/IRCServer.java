@@ -104,7 +104,6 @@ public class IRCServer {
 			this.clientSocket = socket;
 			connection = socket.getInetAddress().toString().replaceAll("/", "") + ":" + socket.getPort();
 		}
-
 		
 		//Read the input from the user and handle it
 		@Override
