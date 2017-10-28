@@ -47,7 +47,7 @@ public class IRCServer {
             try {
             	clientConnection tempRef = new clientConnection(serverSocket.accept());
 				clientList.add(tempRef);
-            	tempRef.run();
+            	new Thread(tempRef).start();
 			} catch (IOException e) {
 				System.out.println(e.toString());
 			}
@@ -86,11 +86,15 @@ public class IRCServer {
 				this.outputToClient = new PrintWriter(clientSocket.getOutputStream(), true);
 				this.inputFromClient = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
 				outputToClient.println(serverName);
-				nickname = '[' + inputFromClient.readLine() + ']';
-				
-				chatLog.add("[Server] - " + nickname + " has joined");
-				broadcastAll();
 				System.out.println("\nConnection from - " + connection);
+				
+				String nick = inputFromClient.readLine();
+				if (!nick.equals("") && !nick.equals("Server") && !nick.equals("!quit")) {
+					nickname = '[' + nick + ']';
+
+					chatLog.add("[Server] - " + nickname + " has joined");
+					broadcastAll();
+				}
 				
 				while(true) {
 					String curLine = inputFromClient.readLine();
@@ -102,14 +106,13 @@ public class IRCServer {
 						 *    !adminLogin <password>
 						 *    !changeNick <nickname>
 						 *    !help
-						 *    !quit
 						 *    
 						 *  Only possible with admin perms
 						 *    !setServerName <name>
 						 *    !kick <nickname>
 						 *    !shutdown
 						 */
-						Pattern cmdPattern = Pattern.compile("(!adminLogin|!changeNick|!help|!setServerName|!kick|!shutdown|!quit)(.*)");
+						Pattern cmdPattern = Pattern.compile("(!adminLogin|!changeNick|!help|!setServerName|!kick|!shutdown)(.*)");
 						String command = "Invalid Command", args = "";
 						Matcher m = cmdPattern.matcher(curLine);
 						
@@ -131,7 +134,7 @@ public class IRCServer {
 							break;
 							
 						case "!changeNick":
-							if(args != "" && args != "Server") {
+							if(args != "" && args != "Server" && args != "!quit") {
 								chatLog.add("[Server] - " + nickname + " changed their name to [" + args + "]");
 								nickname = '[' + args + ']';
 								broadcastAll();
@@ -142,7 +145,7 @@ public class IRCServer {
 							if (isAdmin == false) {
 								outputToClient.println("Commands:\n    !help\n    !changeNick <nickname>\n    !adminLogin <password>");
 							} else if (isAdmin) {
-								outputToClient.println("Commands:\n    !help\n    !changeNick <nickname>\n    !adminLogin <password>\n\nAdmin Commands:\n    !setServerName <name>\n    !kick <nickname>\n    !shutdown");
+								outputToClient.println("Commands:\n    !help\n    !changeNick <nickname>\n    !adminLogin <password>\n\nAdmin Commands:\n    !setServerName <name>\n    !shutdown");
 							}
 							break;
 							
@@ -150,21 +153,12 @@ public class IRCServer {
 							chatLog.add("[Server] - " + nickname + " has left");
 							broadcastAll();
 							break;
+							
 						case "!setServerName":
 							if(isAdmin) {
 								serverName = args;
 								chatLog.add("[Server] - Server name changed to \"" + serverName + "\"");
 								broadcastAll();
-							} else { outputToClient.println("[Server] - You are not authorized to use this command"); }
-							break;
-							
-						case "!kick":
-							if(isAdmin) {
-								for(clientConnection curConnection : clientList) {
-									if(curConnection.getNick() == args) {
-										curConnection.kick();
-									}
-								}
 							} else { outputToClient.println("[Server] - You are not authorized to use this command"); }
 							break;
 							
@@ -193,20 +187,5 @@ public class IRCServer {
 				e.printStackTrace();
 			}
 		}
-	
-		public String getNick() {
-			return nickname;
-		}
-	
-		public void kick() {
-			outputToClient.println("[Server] - You have been kicked");
-			try {
-				clientSocket.close();
-			} catch (IOException e) {
-				System.out.println(e.toString());
-			}
-		}
 	}
-
-	
 }
