@@ -70,7 +70,7 @@ public class IRCServer {
 	
 	/* When a connection comes in accept the connection creating a socket.
 	 * Add that connection to a list of all connections
-	 * start that thread
+	 * Start a connection handler on a new thread
 	 */
 	public void start() {
 		while (true) {
@@ -127,6 +127,7 @@ public class IRCServer {
 				chatLog.add("[Server] - " + nickname + " has joined");
 				broadcastAll();
 				
+				//Keep reading from the client until the connection closes
 				while(true) {
 					String curLine = inputFromClient.readLine();
 					
@@ -159,10 +160,12 @@ public class IRCServer {
 				chatLog.add("[Server] - " + nickname + " has left");
 				broadcastAll();
 				System.out.println("Connection Exiting - " + connection);
+				return;
 				
 			} catch (Exception e) {
 				
-				e.printStackTrace();
+				System.out.println(e.toString());
+				return;
 			}
 		}
 		
