@@ -29,15 +29,20 @@ public class IRCServer {
 			for(String curStr : args) {
 				String[] parts = curStr.split(":");
 				if(parts[0].equals("port")) {
+					System.out.println("Setting port to: " + parts[1]);
 					port = Integer.parseInt(parts[1]);
-				} else if(parts[0].equals("adminPass")) { 
+				} else if(parts[0].equals("adminPass")) {
+					System.out.println("Setting admin password to: " + parts[1]);
 					pass = parts[1];
 				} else if(parts[0].equals("name")) { 
+					System.out.println("Setting server name to: " + parts[1]);
 					name = parts[1];
 				}
 			}
 			
+			
 			IRCServer myServer = new IRCServer(name,port,pass);
+			System.out.println("Running Server");
 			myServer.start();
 		} else { System.out.println("Usage: IRCServer port:<Port Number> (Optional) adminPass:<admin password> (Optional) name:<server name>"); }
 	}
@@ -84,6 +89,21 @@ public class IRCServer {
 		}
 	}
 	
+	//Search through the existing connections and kick if they have the same nickname
+	public void attemptKick(String args) {
+		for(int i = 0; i < clientList.size();i++) {
+			clientConnection curClient = clientList.get(i);
+			if(curClient.getNick().equals(args)) {
+				chatLog.add("[Server] - " + args + " has been kicked" );
+				curClient.sendMessage("[Server] - You have been kicked");
+				broadcastAll();
+				curClient.close();
+				clientList.remove(i);
+				break;
+			}
+		}
+	}
+	
 	/* A runnable class to handle a clients connection
 	 * Also does most of the logic for commands etc.
 	 */
@@ -110,19 +130,26 @@ public class IRCServer {
 		public void run() {
 			try {
 				//Create the input and output streams to and from the client
+				System.out.println("\nConnection from - " + connection);
 				this.outputToClient = new PrintWriter(clientSocket.getOutputStream(), true);
 				this.inputFromClient = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
 				
-				outputToClient.println(serverName);
-				
-				System.out.println("\nConnection from - " + connection);
-				
-				//Set the nickname of this client
-				String nick = inputFromClient.readLine();
-				if (!nick.equals("") && !nick.equals("Server") && !nick.equals("!quit")) {
-					nickname = '[' + nick + ']';
+				outputToClient.println("[Server] - Welcome to " + serverName);
+
+				//Set and validate the nickname of this client
+				{
+					String nick = "";
+					while(nick.equals("") || nick.equals("Server") || nick.charAt(0) == '!' || nick.length() > 16 || nick.contains(" - ")) {
+						outputToClient.println("[Server] - Please enter a nickname");
+						nick = inputFromClient.readLine();
+						if (nick.equals("") || nick.equals("Server") || nick.charAt(0) == '!' || nick.length() > 16 || nick.contains(" - ")) {
+							outputToClient.println("[Server] - Invalid nickname");
+						} else { outputToClient.println("[Server] - Welcome [" + nick + ']'); }
+					}
+					nick = '[' + nick + ']';
+					nickname = nick;
 				}
-				
+					
 				chatLog.add("[Server] - " + nickname + " has joined");
 				broadcastAll();
 				
@@ -135,7 +162,7 @@ public class IRCServer {
 					//If this line is a command do
 					if (curLine.charAt(0) == '!') {
 						
-						Pattern cmdPattern = Pattern.compile("(!adminLogin|!changeNick|!help|!setServerName|!kick|!shutdown)(.*)");
+						Pattern cmdPattern = Pattern.compile("(!adminLogin|!changeNick|!help|!setServerName|!kick|!shutdown|!kick)(.*)");
 						String command = "Invalid Command", args = "";
 						Matcher m = cmdPattern.matcher(curLine);
 						
@@ -168,8 +195,29 @@ public class IRCServer {
 			}
 		}
 		
+		//Allows me to send messages while outside this class
+		public void sendMessage(String message) {
+			outputToClient.println(message);
+		}
+		
+		//Take a guess at what this one does
+		public String getNick() {
+			return nickname;
+		}
+		
+		public void close() {
+			try {
+				clientSocket.close();
+				outputToClient.close();
+				inputFromClient.close();
+				Thread.currentThread().interrupt();
+			} catch (Exception e) {
+				e.toString();
+			}
+		}
+		
 		//Separates the parsing of commands into a sub so the run method can be read easier.
-		public void parseCommands(String command, String args) {
+		private void parseCommands(String command, String args) {
 			switch (command) {
 			
 			case "!adminLogin":
@@ -193,15 +241,32 @@ public class IRCServer {
 				
 			case "!help":
 				if (isAdmin == false) {
-					outputToClient.println("	Commands:\n    		!help\n    		!changeNick <nickname>\n    		!adminLogin <password>");
+					outputToClient.println(""
+							+ "[Server] - Commands:\n"
+							+ "[Server] -    	!help\n"
+							+ "[Server] -    	!changeNick <nickname>\n"
+							+ "[Server] -    	!adminLogin <password>");
 				} else if (isAdmin) {
-					outputToClient.println("	Commands:\n    		!help\n    		!changeNick <nickname>\n    		!adminLogin <password>\n\n	Admin Commands:\n    		!setServerName <name>\n    		!shutdown");
+					outputToClient.println(""
+							+ "[Server] - Commands:\n"
+							+ "[Server] -     	!help\n"
+							+ "[Server] -     	!changeNick <nickname>\n"
+							+ "[Server] -     	!adminLogin <password>\n"
+							+ "[Server] - Admin Commands:\n"
+							+ "[Server] -     	!setServerName <name>\n"
+							+ "[Server] -     	!kick <name>\n"
+							+ "[Server] -     	!shutdown");
 				}
 				break;
 				
 			case "!quit":
 				chatLog.add("[Server] - " + nickname + " has left");
 				broadcastAll();
+				break;
+			
+			case "!kick":
+				if (!args.matches(""))
+					attemptKick('['+args+']');
 				break;
 				
 			case "!setServerName":
@@ -225,10 +290,6 @@ public class IRCServer {
 			}
 			System.out.printf("%-32s%s%n",connection,"Running command: " + command);
 		}
-		
-		//Allows me to send messages while outside this class
-		public void sendMessage(String message) {
-			outputToClient.println(message);
-		}
+
 	}
 }
