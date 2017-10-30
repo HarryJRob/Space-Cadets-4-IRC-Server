@@ -47,7 +47,7 @@ public class IRCServer {
 		} else { System.out.println("Usage: IRCServer port:<Port Number> (Optional) adminPass:<admin password> (Optional) name:<server name>"); }
 	}
 	
-	//Initialise the server
+	//Initialize the server
 	public IRCServer(String serverName, int portNumber, String adminPassword) {
 		this.serverName = serverName;
 		makeSocket(portNumber);
@@ -205,6 +205,7 @@ public class IRCServer {
 			return nickname;
 		}
 		
+		//Closes all input and output streams of a connection and then closes the socket.
 		public void close() {
 			try {
 				clientSocket.close();
